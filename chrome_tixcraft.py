@@ -19,12 +19,13 @@ import time
 import warnings
 import webbrowser
 from datetime import datetime
-
+import undetected_chromedriver as uc
 import chromedriver_autoinstaller_max
 import requests
 from selenium import webdriver
 from selenium.common.exceptions import (NoAlertPresentException,
                                         NoSuchWindowException,
+                                        StaleElementReferenceException, # <--- 確保這一行存在
                                         UnexpectedAlertPresentException,
                                         WebDriverException)
 from selenium.webdriver.chrome.service import Service
@@ -34,6 +35,10 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select, WebDriverWait
 from urllib3.exceptions import InsecureRequestWarning
+
+#2025/07/04 新增
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
 import util
 from NonBrowser import NonBrowser
@@ -137,6 +142,17 @@ ssl._create_default_https_context = ssl._create_unverified_context
 logging.basicConfig()
 logger = logging.getLogger('logger')
 
+def write_log(msg):
+    log_dir = "log"                      # log 資料夾名稱
+    log_file = "debug_log.txt"           # log 檔案名稱
+    os.makedirs(log_dir, exist_ok=True)  # 若資料夾不存在則自動建立
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # 當前時間
+    log_msg = f"{now_str} {msg}"         # 合併時間與訊息
+    with open(os.path.join(log_dir, log_file), "a", encoding="utf-8") as f:
+        f.write(log_msg + "\n")          # 每行寫入一筆 log
+
+
+# 取得（並依據傳入參數覆蓋）搶票機器人主設定檔內容。
 def get_config_dict(args):
     app_root = util.get_app_root()
     config_filepath = os.path.join(app_root, CONST_MAXBOT_CONFIG_FILE)
@@ -204,22 +220,25 @@ def get_config_dict(args):
 
     return config_dict
 
+# 主要功能是把問題內容寫到指定的檔案裡
 def write_question_to_file(question_text):
     working_dir = os.path.dirname(os.path.realpath(__file__))
     target_path = os.path.join(working_dir, CONST_MAXBOT_QUESTION_FILE)
     util.write_string_to_file(target_path, question_text)
-
+# 主要功能是把最後一次的網址寫到指定的檔案裡
 def write_last_url_to_file(url):
     working_dir = os.path.dirname(os.path.realpath(__file__))
     target_path = os.path.join(working_dir, CONST_MAXBOT_LAST_URL_FILE)
     util.write_string_to_file(target_path, url)
 
+#   讀取最後一次的網址
 def read_last_url_from_file():
     ret = ""
     with open(CONST_MAXBOT_LAST_URL_FILE, "r") as text_file:
         ret = text_file.readline()
     return ret
 
+# 取得喜愛的擴充套件路徑
 def get_favoriate_extension_path(webdriver_path, config_dict):
     #print("webdriver_path:", webdriver_path)
     extension_list = []
@@ -227,12 +246,14 @@ def get_favoriate_extension_path(webdriver_path, config_dict):
     extension_list.append(os.path.join(webdriver_path, CONST_MAXBLOCK_EXTENSION_NAME + ".crx"))
     return extension_list
 
+# 取得chromedriver路徑
 def get_chromedriver_path(webdriver_path):
     chromedriver_path = os.path.join(webdriver_path,"chromedriver")
     if platform.system().lower()=="windows":
         chromedriver_path = os.path.join(webdriver_path,"chromedriver.exe")
     return chromedriver_path
 
+# 取得chrome options
 def get_chrome_options(webdriver_path, config_dict):
     chrome_options = webdriver.ChromeOptions()
     if config_dict["browser"]=="edge":
@@ -324,6 +345,7 @@ def get_chrome_options(webdriver_path, config_dict):
 
     return chrome_options
 
+# 根據設定載入chromedriver
 def load_chromdriver_normal(config_dict, driver_type):
     show_debug_message = True       # debug.
     show_debug_message = False      # online
@@ -390,7 +412,7 @@ def load_chromdriver_normal(config_dict, driver_type):
 
     return driver
 
-
+# 根據設定載入undetected_chromedriver
 def get_uc_options(uc, config_dict, webdriver_path):
     options = uc.ChromeOptions()
     options.page_load_strategy = 'eager'
@@ -483,6 +505,7 @@ def get_uc_options(uc, config_dict, webdriver_path):
 
     return options
 
+# 根據設定載入undetected_chromedriver
 def load_chromdriver_uc(config_dict):
     import undetected_chromedriver as uc
 
@@ -601,6 +624,7 @@ def load_chromdriver_uc(config_dict):
 
     return driver
 
+# 關閉瀏覽器分頁
 def close_browser_tabs(driver):
     if not driver is None:
         try:
@@ -612,258 +636,115 @@ def close_browser_tabs(driver):
         except Exception as excSwithFail:
             pass
 
+# 根據設定初始化 WebDriver
 def get_driver_by_config(config_dict):
-    driver = None
-
-    # read config.
-    homepage = config_dict["homepage"]
-
-    # output config:
+    """
+    初始化並設定 WebDriver (終極融合版)
+    - 融合了 undetected-chromedriver 的偽裝技術與舊版的豐富功能。
+    """
+    # 步驟 1: 輸出基本資訊 (來自舊版)
     print("maxbot app version:", CONST_APP_VERSION)
     print("python version:", platform.python_version())
     print("platform:", platform.platform())
-    print("homepage:", homepage)
+    print("homepage:", config_dict["homepage"])
     print("browser:", config_dict["browser"])
-    #print("headless:", config_dict["advanced"]["headless"])
-    #print("ticket_number:", str(config_dict["ticket_number"]))
-
-    #print(config_dict["tixcraft"])
-    #print("==[advanced config]==")
-    if config_dict["advanced"]["verbose"]:
-        print(config_dict["advanced"])
     print("webdriver_type:", config_dict["webdriver_type"])
 
-    # entry point
-    if homepage is None:
-        homepage = ""
+    # 步驟 2: 設定 WebDriver 選項 (融合新舊版)
+    options = uc.ChromeOptions()
+    
+    # a. 新版的核心偽裝選項
+    options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_argument("--start-maximized")
+    
+    # b. 舊版中所有實用的 add_argument 選項
+    options.add_argument(f'--user-agent={USER_AGENT}')
+    options.add_argument('--ignore-certificate-errors')
+    options.add_argument("--lang=zh-TW")
+    options.add_argument("--disable-infobars")
+    options.add_argument("--disable-notifications")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    
+    # c. Headless 和 Proxy 設定
+    if config_dict["advanced"]["headless"]:
+        options.add_argument('--headless=new')
+    if len(config_dict["advanced"]["proxy_server_port"]) > 0:
+        options.add_argument(f"--proxy-server={config_dict['advanced']['proxy_server_port']}")
 
-    Root_Dir = util.get_app_root()
-    webdriver_path = os.path.join(Root_Dir, "webdriver")
-    #print("platform.system().lower():", platform.system().lower())
+    # 步驟 3: 初始化 Driver (加入版本感知)
+    driver = None
+    try:
+        print("INFO: 啟用 undetected-chromedriver 模式...")
+        
+        # 自動偵測已安裝的 Chrome 版本，並指定給 undetected-chromedriver
+        print("INFO: 自動偵測已安裝的 Chrome 瀏覽器版本...")
+        chrome_major_version = int(chromedriver_autoinstaller_max.get_chrome_version().split('.')[0])
+        print(f"SUCCESS: 偵測到 Chrome 主版本為: {chrome_major_version}")
+        
+        driver = uc.Chrome(options=options, use_subprocess=True, version_main=chrome_major_version)
+        print("SUCCESS: WebDriver 已成功啟動。")
 
-    if config_dict["browser"] in ["chrome","brave"]:
-        # method 6: Selenium Stealth
-        if config_dict["webdriver_type"] == CONST_WEBDRIVER_TYPE_SELENIUM:
-            driver = load_chromdriver_normal(config_dict, config_dict["webdriver_type"])
-        if config_dict["webdriver_type"] == CONST_WEBDRIVER_TYPE_UC:
-            # method 5: uc
-            # multiprocessing not work bug.
-            if platform.system().lower()=="windows":
-                if hasattr(sys, 'frozen'):
-                    from multiprocessing import freeze_support
-                    freeze_support()
-            driver = load_chromdriver_uc(config_dict)
-        if config_dict["webdriver_type"] == CONST_WEBDRIVER_TYPE_DP:
-            #driver = ChromiumPage()
-            pass
+    except Exception as e:
+        print(f"ERROR: 初始化 undetected-chromedriver 失敗: {e}")
+        return None
 
-    if config_dict["browser"] == "firefox":
-        # default os is linux/mac
-        # download url: https://github.com/mozilla/geckodriver/releases
-        chromedriver_path = os.path.join(webdriver_path,"geckodriver")
-        if platform.system().lower()=="windows":
-            chromedriver_path = os.path.join(webdriver_path,"geckodriver.exe")
+    # 步驟 4: 網路請求攔截 (來自舊版)
+    try:
+        print("INFO: 正在設定網路請求攔截規則...")
+        NETWORK_BLOCKED_URLS = CONST_MAXBLOCK_EXTENSION_FILTER # 直接使用您定義好的常數
+        if config_dict["advanced"]["hide_some_image"]:
+             NETWORK_BLOCKED_URLS.extend(['*.woff', '*.woff2', '*.ttf', '*.otf', '*.ico', '*.jpg', '*.png', '*.gif'])
+        if config_dict["advanced"]["block_facebook_network"]:
+            NETWORK_BLOCKED_URLS.extend(['*facebook.com/*', '*.fbcdn.net/*'])
+        
+        driver.execute_cdp_cmd('Network.setBlockedURLs', {"urls": NETWORK_BLOCKED_URLS})
+        driver.execute_cdp_cmd('Network.enable', {})
+        print("SUCCESS: 網路攔截規則已設定。")
+    except Exception as e:
+        print(f"WARNING: 設定網路攔截時失敗: {e}")
 
-        if "macos" in platform.platform().lower():
-            if "arm64" in platform.platform().lower():
-                chromedriver_path = os.path.join(webdriver_path,"geckodriver_arm")
+    # 步驟 5: 根據不同網站，執行 Cookie 注入和自動跳轉 (來自舊版 + 新版優化)
+    try:
+        # a. 先導航至一個基礎網域，以便設定 cookie
+        print("INFO: 正在準備注入 Cookie...")
+        driver.get("https://www.google.com") # 先去一個中立的網站
+        
+        # b. 注入 Tixcraft Family Cookie
+        tixcraft_sid = config_dict.get("advanced", {}).get("tixcraft_sid", "").strip()
+        if tixcraft_sid:
+            print("INFO: 偵測到 Tixcraft SID，正在注入...")
+            driver.get("https://tixcraft.com/") # 跳轉到 tixcraft 網域
+            driver.delete_cookie("SID")
+            driver.add_cookie({"name":"SID", "value": tixcraft_sid, "domain": ".tixcraft.com", "path" : "/", "secure":True})
+            print("SUCCESS: Tixcraft SID 注入成功！")
 
-        webdriver_service = Service(chromedriver_path)
-        driver = None
-        try:
-            from selenium.webdriver.firefox.options import Options
-            options = Options()
-            if config_dict["advanced"]["headless"]:
-                options.add_argument('--headless')
-                #options.add_argument('--headless=new')
-            if platform.system().lower()=="windows":
-                binary_path = "C:\\Program Files\\Mozilla Firefox\\firefox.exe"
-                if not os.path.exists(binary_path):
-                    binary_path = os.path.expanduser('~') + "\\AppData\\Local\\Mozilla Firefox\\firefox.exe"
-                if not os.path.exists(binary_path):
-                    binary_path = "C:\\Program Files (x86)\\Mozilla Firefox\\firefox.exe"
-                if not os.path.exists(binary_path):
-                    binary_path = "D:\\Program Files\\Mozilla Firefox\\firefox.exe"
-                options.binary_location = binary_path
+        # c. [關鍵修正] 注入 ibon 全網域 Cookie
+        ibon_cookie_value = config_dict.get("advanced", {}).get("ibonqware", "").strip()
+        if ibon_cookie_value:
+            print("INFO: 偵測到 ibonqware Cookie，正在注入...")
+            driver.get("https://ticket.ibon.com.tw/") # 跳轉到 ibon 網域
+            driver.delete_cookie("ibonqware")
+            driver.add_cookie({
+                "name": "ibonqware", "value": ibon_cookie_value,
+                "domain": ".ibon.com.tw", # 使用 .ibon.com.tw 來讓所有子網域共用
+                "path": "/", "secure": True
+            })
+            print("SUCCESS: ibonqware Cookie 注入成功！")
+            
+        # ... 您可以在此處比照上面的邏輯，加入其他網站的 Cookie 注入 ...
 
-            driver = webdriver.Firefox(service=webdriver_service, options=options)
-        except Exception as exc:
-            error_message = str(exc)
-            left_part = None
-            if "Stacktrace:" in error_message:
-                left_part = error_message.split("Stacktrace:")[0]
-                print(left_part)
-            else:
-                print(exc)
+    except Exception as e:
+        print(f"ERROR: 在注入 Cookie 過程中發生錯誤: {e}")
 
-    if config_dict["browser"] == "edge":
-        # default os is linux/mac
-        # download url: https://developer.microsoft.com/zh-tw/microsoft-edge/tools/webdriver/
-        chromedriver_path = os.path.join(webdriver_path,"msedgedriver")
-        if platform.system().lower()=="windows":
-            chromedriver_path = os.path.join(webdriver_path,"msedgedriver.exe")
+    # 步驟 6: 完成所有前置作業後，最終導航至你想要的目標網頁
+    print(f"INFO: 所有前置作業完成，正在前往最終目標: {config_dict['homepage']}")
+    driver.get(config_dict['homepage'])
 
-        webdriver_service = Service(chromedriver_path)
-        chrome_options = get_chrome_options(webdriver_path, config_dict)
-
-        driver = None
-        try:
-            driver = webdriver.Edge(service=webdriver_service, options=chrome_options)
-        except Exception as exc:
-            error_message = str(exc)
-            #print(error_message)
-            left_part = None
-            if "Stacktrace:" in error_message:
-                left_part = error_message.split("Stacktrace:")[0]
-                print(left_part)
-
-    if config_dict["browser"] == "safari":
-        driver = None
-        try:
-            driver = webdriver.Safari()
-        except Exception as exc:
-            error_message = str(exc)
-            #print(error_message)
-            left_part = None
-            if "Stacktrace:" in error_message:
-                left_part = error_message.split("Stacktrace:")[0]
-                print(left_part)
-
-    if driver is None:
-        print("create web driver object fail @_@;")
-    else:
-        try:
-            NETWORK_BLOCKED_URLS = [
-                '*.clarity.ms/*',
-                '*.cloudfront.com/*',
-                '*.doubleclick.net/*',
-                '*.lndata.com/*',
-                '*.rollbar.com/*',
-                '*.twitter.com/i/*',
-                '*/adblock.js',
-                '*/google_ad_block.js',
-                '*cityline.com/js/others.min.js',
-                '*anymind360.com/*',
-                '*cdn.cookielaw.org/*',
-                '*e2elog.fetnet.net*',
-                '*fundingchoicesmessages.google.com/*',
-                '*google-analytics.*',
-                '*googlesyndication.*',
-                '*googletagmanager.*',
-                '*googletagservices.*',
-                '*img.uniicreative.com/*',
-                '*platform.twitter.com/*',
-                '*play.google.com/*',
-                '*player.youku.*',
-                '*syndication.twitter.com/*',
-                '*youtube.com/*',
-            ]
-
-            if config_dict["advanced"]["hide_some_image"]:
-                NETWORK_BLOCKED_URLS.append('*.woff')
-                NETWORK_BLOCKED_URLS.append('*.woff2')
-                NETWORK_BLOCKED_URLS.append('*.ttf')
-                NETWORK_BLOCKED_URLS.append('*.otf')
-                NETWORK_BLOCKED_URLS.append('*fonts.googleapis.com/earlyaccess/*')
-                NETWORK_BLOCKED_URLS.append('*/ajax/libs/font-awesome/*')
-                NETWORK_BLOCKED_URLS.append('*.ico')
-                NETWORK_BLOCKED_URLS.append('*ticketimg2.azureedge.net/image/ActivityImage/*')
-                NETWORK_BLOCKED_URLS.append('*static.tixcraft.com/images/activity/*')
-                NETWORK_BLOCKED_URLS.append('*static.ticketmaster.sg/images/activity/*')
-                NETWORK_BLOCKED_URLS.append('*static.ticketmaster.com/images/activity/*')
-                NETWORK_BLOCKED_URLS.append('*ticketimg2.azureedge.net/image/ActivityImage/ActivityImage_*')
-                NETWORK_BLOCKED_URLS.append('*.azureedge.net/QWARE_TICKET//images/*')
-                NETWORK_BLOCKED_URLS.append('*static.ticketplus.com.tw/event/*')
-
-                #NETWORK_BLOCKED_URLS.append('https://kktix.cc/change_locale?locale=*')
-                NETWORK_BLOCKED_URLS.append('https://t.kfs.io/assets/logo_*.png')
-                NETWORK_BLOCKED_URLS.append('https://t.kfs.io/assets/icon-*.png')
-                NETWORK_BLOCKED_URLS.append('https://t.kfs.io/upload_images/*.jpg')
-
-            if config_dict["advanced"]["block_facebook_network"]:
-                NETWORK_BLOCKED_URLS.append('*facebook.com/*')
-                NETWORK_BLOCKED_URLS.append('*.fbcdn.net/*')
-
-            # Chrome DevTools Protocal
-            if config_dict["browser"] in CONST_CHROME_FAMILY:
-                driver.execute_cdp_cmd('Network.setBlockedURLs', {"urls": NETWORK_BLOCKED_URLS})
-                driver.execute_cdp_cmd('Network.enable', {})
-
-            if 'kktix.c' in homepage:
-                if len(config_dict["advanced"]["kktix_account"])>0:
-                    # for like human.
-                    try:
-                        driver.get(homepage)
-                        time.sleep(5)
-                    except Exception as e:
-                        pass
-                    if not 'https://kktix.com/users/sign_in?' in homepage:
-                        homepage = CONST_KKTIX_SIGN_IN_URL % (homepage)
-
-            if 'famiticket.com' in homepage:
-                if len(config_dict["advanced"]["fami_account"])>0:
-                    homepage = CONST_FAMI_SIGN_IN_URL
-
-            if 'kham.com' in homepage:
-                if len(config_dict["advanced"]["kham_account"])>0:
-                    homepage = CONST_KHAM_SIGN_IN_URL
-
-            if 'ticket.com.tw' in homepage:
-                if len(config_dict["advanced"]["ticket_account"])>0:
-                    homepage = CONST_TICKET_SIGN_IN_URL
-
-            if 'urbtix.hk' in homepage:
-                if len(config_dict["advanced"]["urbtix_account"])>0:
-                    homepage = CONST_URBTIX_SIGN_IN_URL
-
-            if 'cityline.com' in homepage:
-                if len(config_dict["advanced"]["cityline_account"])>0:
-                    homepage = CONST_CITYLINE_SIGN_IN_URL
-
-            if 'hkticketing.com' in homepage:
-                if len(config_dict["advanced"]["hkticketing_account"])>0:
-                    homepage = CONST_HKTICKETING_SIGN_IN_URL
-
-            if 'ticketplus.com.tw' in homepage:
-                if len(config_dict["advanced"]["ticketplus_account"]) > 1:
-                    homepage = "https://ticketplus.com.tw/"
-
-            print("goto url:", homepage)
-            driver.get(homepage)
-            time.sleep(3.0)
-
-            tixcraft_family = False
-            if 'tixcraft.com' in homepage:
-                tixcraft_family = True
-
-            if 'indievox.com' in homepage:
-                tixcraft_family = True
-
-            if 'ticketmaster.' in homepage:
-                tixcraft_family = True
-
-            if tixcraft_family:
-                tixcraft_sid = config_dict["advanced"]["tixcraft_sid"]
-                if len(tixcraft_sid) > 1:
-                    driver.delete_cookie("SID")
-                    driver.add_cookie({"name":"SID", "value": tixcraft_sid, "path" : "/", "secure":True})
-
-            if 'ibon.com' in homepage:
-                ibonqware = config_dict["advanced"]["ibonqware"]
-                if len(ibonqware) > 1:
-                    driver.delete_cookie("ibonqware")
-                    driver.add_cookie({"name":"ibonqware", "value": ibonqware, "domain" : "ibon.com.tw", "secure":True})
-
-        except WebDriverException as exce2:
-            print('oh no not again, WebDriverException')
-            print('WebDriverException:', exce2)
-        except Exception as exce1:
-            print('get URL Exception:', exce1)
-            pass
-
+    print("SUCCESS: WebDriver 已完成所有初始化設定。")
     return driver
 
-
+# 強制點擊按鈕，並在 iframe 中操作。
 def force_press_button_iframe(driver, f, select_by, select_query, force_submit=True):
     if not f:
         # ensure we are on main content frame
@@ -904,7 +785,7 @@ def clean_tag_by_selector(driver, select_query, more_script = ""):
     element_script = "eachItem.outerHTML='';"
     javascript_tag_by_selector(driver, select_query, element_script, more_script = more_script)
 
-# PS: selector query string must without single quota.
+# 強制點擊按鈕，並在指定的選擇器中操作。
 def javascript_tag_by_selector(driver, select_query, element_script, more_script = ""):
     try:
         driver.set_script_timeout(1)
@@ -920,6 +801,7 @@ selectSoldoutItems.forEach((eachItem) =>
         #print(exc)
         pass
 
+# 強制點擊按鈕，並在 iframe 中操作。
 def press_button(driver, select_by, select_query, force_submit=True):
     ret = False
     next_step_button = None
@@ -952,7 +834,7 @@ def press_button(driver, select_by, select_query, force_submit=True):
                         pass
     return ret
 
-# close some div on home url.
+# 關閉 Tixcraft 的 Cookie 同意視窗
 def tixcraft_home_close_window(driver):
     accept_all_cookies_btn = None
     try:
@@ -963,7 +845,7 @@ def tixcraft_home_close_window(driver):
         #print(exc)
         pass
 
-# from detail to game
+# Tixcraft 特定的重定向處理
 def tixcraft_redirect(driver, url):
     ret = False
     game_name = ""
@@ -981,7 +863,7 @@ def tixcraft_redirect(driver, url):
                 pass
     return ret
 
-
+# Tixcraft 自動選擇日期功能
 def tixcraft_date_auto_select(driver, url, config_dict, domain_name):
     show_debug_message = True    # debug.
     show_debug_message = False   # online
@@ -1219,6 +1101,7 @@ def tixcraft_date_auto_select(driver, url, config_dict, domain_name):
 
     return is_date_clicked
 
+# Tixcraft 自動選擇日期功能
 def ticketmaster_date_auto_select(driver, url, config_dict, domain_name):
     show_debug_message = True    # debug.
     show_debug_message = False   # online
@@ -1343,11 +1226,7 @@ def ticketmaster_date_auto_select(driver, url, config_dict, domain_name):
     return is_date_clicked
 
 
-# PURPOSE: get target area list.
-# RETURN:
-#   is_need_refresh
-#   matched_blocks
-# PS: matched_blocks will be None, if length equals zero.
+# 根據 Tixcraft 的區域關鍵字，選擇目標區域。
 def get_tixcraft_target_area(el, config_dict, area_keyword_item):
     show_debug_message = True       # debug.
     show_debug_message = False      # online
@@ -1460,7 +1339,7 @@ def get_tixcraft_target_area(el, config_dict, area_keyword_item):
 
     return is_need_refresh, matched_blocks
 
-
+# 根據 Ticketmaster 的區域關鍵字，選擇目標區域。
 def get_ticketmaster_target_area(config_dict, area_keyword_item, zone_info):
     show_debug_message = True       # debug.
     show_debug_message = False      # online
@@ -1548,8 +1427,7 @@ def get_ticketmaster_target_area(config_dict, area_keyword_item, zone_info):
 
     return is_need_refresh, matched_blocks
 
-# PS: auto refresh condition 1: no keyword + no hyperlink.
-# PS: auto refresh condition 2: with keyword + no hyperlink.
+# Tixcraft 自動選擇區域功能
 def tixcraft_area_auto_select(driver, url, config_dict):
     show_debug_message = True       # debug.
     show_debug_message = False      # online
@@ -1615,6 +1493,7 @@ def tixcraft_area_auto_select(driver, url, config_dict):
             if config_dict["advanced"]["auto_reload_page_interval"] > 0:
                 time.sleep(config_dict["advanced"]["auto_reload_page_interval"])
 
+# Ticketmaster 自動選擇區域功能
 def ticketmaster_area_auto_select(driver, config_dict, zone_info):
     show_debug_message = True       # debug.
     show_debug_message = False      # online
@@ -1672,6 +1551,7 @@ def ticketmaster_area_auto_select(driver, config_dict, zone_info):
         if config_dict["advanced"]["auto_reload_page_interval"] > 0:
             time.sleep(config_dict["advanced"]["auto_reload_page_interval"])
 
+# 根據選擇器選擇票數。
 def ticket_number_select_fill(driver, select_obj, ticket_number):
     is_ticket_number_assigned = False
     if not select_obj is None:
@@ -1721,6 +1601,7 @@ def ticket_number_select_fill(driver, select_obj, ticket_number):
 
     return is_ticket_number_assigned
 
+# 根據選擇器取得文字。
 def get_text_by_selector(driver, my_css_selector, attribute='innerHTML'):
     div_element = None
     try:
@@ -1741,7 +1622,7 @@ def get_text_by_selector(driver, my_css_selector, attribute='innerHTML'):
             print("get text fail:", my_css_selector)
     return row_text
 
-
+# 填寫通用驗證碼表單。
 def fill_common_verify_form(driver, config_dict, inferred_answer_string, fail_list, input_text_css, next_step_button_css, submit_by_enter, check_input_interval):
     show_debug_message = True       # debug.
     show_debug_message = False      # online
@@ -1886,15 +1767,17 @@ def fill_common_verify_form(driver, config_dict, inferred_answer_string, fail_li
 
     return is_answer_sent, fail_list
 
-
+# Tixcraft 驗證碼輸入功能
 def ticketmaster_promo(driver, config_dict, fail_list):
     question_selector = '#promoBox'
     return tixcraft_input_check_code(driver, config_dict, fail_list, question_selector)
 
+# Tixcraft 驗證碼輸入功能
 def tixcraft_verify(driver, config_dict, fail_list):
     question_selector = '.zone-verify'
     return tixcraft_input_check_code(driver, config_dict, fail_list, question_selector)
 
+#   Tixcraft 驗證碼輸入功能
 def tixcraft_input_check_code(driver, config_dict, fail_list, question_selector):
     show_debug_message = True       # debug.
     show_debug_message = False      # online
@@ -2160,13 +2043,83 @@ def tixcraft_auto_ocr(driver, ocr, away_from_keyboard_enable, previous_answer, C
 
     return is_need_redo_ocr, previous_answer, is_form_sumbited
 
+# Tixcraft 同意條款功能
+# def tixcraft_ticket_main_agree(driver, config_dict):
+#     is_finish_checkbox_click = False
+#     for i in range(3):
+#         is_finish_checkbox_click = check_checkbox(driver, By.CSS_SELECTOR, '#TicketForm_agree')
+#         if is_finish_checkbox_click:
+#             break
+#     return is_finish_checkbox_click
+
+# Tixcraft 同意條款功能 20250704
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 def tixcraft_ticket_main_agree(driver, config_dict):
     is_finish_checkbox_click = False
     for i in range(3):
-        is_finish_checkbox_click = check_checkbox(driver, By.CSS_SELECTOR, '#TicketForm_agree')
-        if is_finish_checkbox_click:
+        msg = f"[Log] 第 {i+1} 次嘗試勾選同意框"
+        print(msg)
+        write_log(msg)
+        try:
+            checkbox = WebDriverWait(driver, 1).until(
+                EC.element_to_be_clickable((By.CSS_SELECTOR, '#TicketForm_agree'))
+            )
+            msg = f"[Log] 找到checkbox, 是否顯示: {checkbox.is_displayed()}, 是否啟用: {checkbox.is_enabled()}, 是否已選: {checkbox.is_selected()}"
+            print(msg)
+            write_log(msg)
+            msg = "[Log] checkbox HTML:" + checkbox.get_attribute('outerHTML')[:200]
+            print(msg)
+            write_log(msg)
+            if not checkbox.is_selected():
+                driver.execute_script("arguments[0].click();", checkbox)
+                msg = "[Log] 嘗試點擊 checkbox"
+                print(msg)
+                write_log(msg)
+            else:
+                msg = "[Log] checkbox 本來就已經勾選了"
+                print(msg)
+                write_log(msg)
+            is_finish_checkbox_click = True
+            msg = "[Log] 勾選成功，跳出回圈"
+            print(msg)
+            write_log(msg)
             break
+        except Exception as exc:
+            msg = f"[Error] 第{i+1}次勾選失敗，例外訊息: {exc}"
+            print(msg)
+            write_log(msg)
+            msg = "[Error] 目前 URL:" + driver.current_url
+            print(msg)
+            write_log(msg)
+            msg = "[Error] 頁面片段:" + driver.page_source[:500]
+            print(msg)
+            write_log(msg)
+            try:
+                driver.save_screenshot(f"agree_fail_{i+1}.png")
+                msg = f"[Log] 已儲存失敗截圖 agree_fail_{i+1}.png"
+                print(msg)
+                write_log(msg)
+            except:
+                pass
+            try:
+                alert = driver.switch_to.alert
+                alert.accept()
+                msg = "[Log] 自動關閉彈窗"
+                print(msg)
+                write_log(msg)
+            except:
+                pass
+            time.sleep(0.2)
+    if not is_finish_checkbox_click:
+        msg = "[Error] 三次後仍未成功勾選同意條款"
+        print(msg)
+        write_log(msg)
     return is_finish_checkbox_click
+
+
+
 
 def get_tixcraft_ticket_select_by_keyword(driver, config_dict, area_keyword_item):
     show_debug_message = True       # debug.
@@ -2343,33 +2296,98 @@ def tixcraft_assign_ticket_number(driver, config_dict):
 
     return is_ticket_number_assigned, select_obj
 
+# Tixcraft 票務主流程
+# def tixcraft_ticket_main(driver, config_dict, ocr, Captcha_Browser, domain_name):
+#     is_agree_at_webdriver = False
+#     if not config_dict["browser"] in CONST_CHROME_FAMILY:
+#         is_agree_at_webdriver = True
+#     else:
+#         if not config_dict["advanced"]["chrome_extension"]:
+#             is_agree_at_webdriver = True
+#     if is_agree_at_webdriver:
+#         # use extension instead of selenium.
+#         # checkbox javascrit code at chrome extension.
+#         tixcraft_ticket_main_agree(driver, config_dict)
+
+#     is_ticket_number_assigned = False
+
+#     # PS: some events on tixcraft have multi <select>.
+#     is_ticket_number_assigned, select_obj = tixcraft_assign_ticket_number(driver, config_dict)
+
+#     if not is_ticket_number_assigned:
+#         # should not enter this block, due to extension done.
+#         ticket_number = str(config_dict["ticket_number"])
+#         is_ticket_number_assigned = ticket_number_select_fill(driver, select_obj, ticket_number)
+
+#     # must wait ticket number assign to focus captcha.
+#     if is_ticket_number_assigned:
+#         tixcraft_ticket_main_ocr(driver, config_dict, ocr, Captcha_Browser, domain_name)
 
 def tixcraft_ticket_main(driver, config_dict, ocr, Captcha_Browser, domain_name):
+    import os
+    from datetime import datetime
+    # 強制不使用 extension
+    config_dict["advanced"]["chrome_extension"] = False
+
+    write_log("[Log] 進入 tixcraft_ticket_main（Tixcraft 票務主流程）")
     is_agree_at_webdriver = False
+
+    # 判斷瀏覽器型態與是否使用 chrome extension
     if not config_dict["browser"] in CONST_CHROME_FAMILY:
         is_agree_at_webdriver = True
+        write_log("[Log] 使用非 Chrome Family 瀏覽器，需程式自動勾選同意")
     else:
         if not config_dict["advanced"]["chrome_extension"]:
             is_agree_at_webdriver = True
+            write_log("[Log] Chrome extension 未啟用，需程式自動勾選同意")
+        else:
+            write_log("[Log] 已啟用 Chrome extension，由擴充元件處理同意條款")
+
+    # 執行同意條款勾選流程
     if is_agree_at_webdriver:
-        # use extension instead of selenium.
-        # checkbox javascrit code at chrome extension.
+        write_log("[Log] 呼叫 tixcraft_ticket_main_agree，嘗試自動勾選同意條款")
         tixcraft_ticket_main_agree(driver, config_dict)
+        write_log("[Log] 勾選同意條款流程結束")
 
     is_ticket_number_assigned = False
 
-    # PS: some events on tixcraft have multi <select>.
-    is_ticket_number_assigned, select_obj = tixcraft_assign_ticket_number(driver, config_dict)
+    # 執行票數選擇，部分活動會有多個<select>
+    write_log("[Log] 執行 tixcraft_assign_ticket_number，準備選擇票數")
+    try:
+        is_ticket_number_assigned, select_obj = tixcraft_assign_ticket_number(driver, config_dict)
+        write_log(f"[Log] 票數指派結果：is_ticket_number_assigned={is_ticket_number_assigned}")
+    except Exception as exc:
+        write_log(f"[Error] tixcraft_assign_ticket_number 發生錯誤：{exc}")
+        return False
 
+    # 如果前面沒成功選票數，再試一次用手動填入方式
     if not is_ticket_number_assigned:
-        # should not enter this block, due to extension done.
-        ticket_number = str(config_dict["ticket_number"])
-        is_ticket_number_assigned = ticket_number_select_fill(driver, select_obj, ticket_number)
+        write_log("[Log] 尚未選到票數，嘗試用 ticket_number_select_fill 填入票數")
+        try:
+            ticket_number = str(config_dict["ticket_number"])
+            is_ticket_number_assigned = ticket_number_select_fill(driver, select_obj, ticket_number)
+            write_log(f"[Log] ticket_number_select_fill 結果：is_ticket_number_assigned={is_ticket_number_assigned}")
+        except Exception as exc:
+            write_log(f"[Error] ticket_number_select_fill 發生錯誤：{exc}")
+            return False
 
-    # must wait ticket number assign to focus captcha.
+    # 成功選到票數後，進入驗證碼流程
     if is_ticket_number_assigned:
-        tixcraft_ticket_main_ocr(driver, config_dict, ocr, Captcha_Browser, domain_name)
+        write_log("[Log] 已選到票數，開始驗證碼處理")
+        try:
+            tixcraft_ticket_main_ocr(driver, config_dict, ocr, Captcha_Browser, domain_name)
+            write_log("[Log] tixcraft_ticket_main_ocr 執行完成")
+        except Exception as exc:
+            write_log(f"[Error] tixcraft_ticket_main_ocr 發生錯誤：{exc}")
+            return False
+    else:
+        write_log("[Error] 票數選擇失敗，流程提前結束")
+        return False
 
+    return True
+
+
+# Tixcraft 票務主流程 OCR 功能
 def tixcraft_ticket_main_ocr(driver, config_dict, ocr, Captcha_Browser, domain_name):
     away_from_keyboard_enable = config_dict["ocr_captcha"]["force_submit"]
     if not config_dict["ocr_captcha"]["enable"]:
@@ -4814,329 +4832,133 @@ def cityline_performance(driver, config_dict):
                         if click_ret:
                             break
 
+def get_shadow_root(driver, host_element):
+    """取得一個元素的 Shadow Root"""
+    return driver.execute_script('return arguments[0].shadowRoot', host_element)
+#
 def ibon_date_auto_select(driver, config_dict):
-    show_debug_message = True       # debug.
-    show_debug_message = False      # online
-
-    if config_dict["advanced"]["verbose"]:
-        show_debug_message = True
-
-    auto_select_mode = config_dict["date_auto_select"]["mode"]
-    date_keyword = config_dict["date_auto_select"]["date_keyword"].strip()
-    auto_reload_coming_soon_page_enable = config_dict["tixcraft"]["auto_reload_coming_soon_page"]
-
-    if show_debug_message:
-        print("date_keyword:", date_keyword)
-        print("auto_reload_coming_soon_page_enable:", auto_reload_coming_soon_page_enable)
-
-    matched_blocks = None
-
-    area_list = None
+    """處理日期選擇頁面 (智能等待最終版)"""
+    wait = WebDriverWait(driver, 10)
+    print("\n========== [ibon 流程] 步驟 1: 日期選擇 ==========")
     try:
-        my_css_selector = "div.single-content > div > div.row > div > div.tr"
-        area_list = driver.find_elements(By.CSS_SELECTOR, my_css_selector)
-    except Exception as exc:
-        print("find date-time rows fail")
-        print(exc)
+        raw_keyword = config_dict["date_auto_select"]["date_keyword"].strip()
+        date_keyword = raw_keyword.strip('"')
+        auto_reload_enable = config_dict["tixcraft"]["auto_reload_coming_soon_page"]
+        reload_interval = config_dict["advanced"]["auto_reload_page_interval"]
 
-    #PS: some blocks are generate by ajax, not appear at first time.
-    formated_area_list = None
-    if not area_list is None:
-        area_list_count = len(area_list)
-        if show_debug_message:
-            print("date_list_count:", area_list_count)
+        # [智能等待] 確保 Shadow DOM 宿主已載入
+        shadow_root = get_specific_shadow_root(driver, wait, "app-game")
+        if not shadow_root: return False
 
-        if area_list_count > 0:
-            formated_area_list = []
+        # [關鍵升級] 明確等待場次列表載入完成
+        print("INFO: 正在等待場次列表載入...")
+        wait.until(lambda d: len(shadow_root.find_elements(By.CSS_SELECTOR, "div#GameInfoList div.tr")) > 0)
+        all_rows = shadow_root.find_elements(By.CSS_SELECTOR, "div#GameInfoList div.tr")
+        print(f"SUCCESS: 場次列表已載入，共找到 {len(all_rows)} 個場次。")
 
-            # filter list.
-            for row in area_list:
-                # default is enabled.
-                row_is_enabled=True
-                el_btn = None
-                try:
-                    my_css_selector = "button"
-                    el_btn = row.find_element(By.TAG_NAME, my_css_selector)
-                    if not el_btn is None:
-                        if not el_btn.is_enabled():
-                            #print("row's button disabled!")
-                            row_is_enabled=False
-                except Exception as exc:
-                    if show_debug_message:
-                        print(exc)
-                    pass
-
-                if row_is_enabled:
-                    formated_area_list.append(row)
-
-    if not formated_area_list is None:
-        area_list_count = len(formated_area_list)
-        if show_debug_message:
-            print("formated_area_list count:", area_list_count)
-        if area_list_count > 0:
-            if len(date_keyword) == 0:
-                matched_blocks = formated_area_list
-            else:
-                # match keyword.
-                if show_debug_message:
-                    print("start to match keyword:", date_keyword)
-
-                matched_blocks = util.get_matched_blocks_by_keyword(config_dict, auto_select_mode, date_keyword, formated_area_list)
-
-                if show_debug_message:
-                    if not matched_blocks is None:
-                        print("after match keyword, found count:", len(matched_blocks))
-        else:
-            print("not found date-time-position")
-            pass
-    else:
-        print("date date-time-position is None")
-        pass
-
-    target_area = util.get_target_item_from_matched_list(matched_blocks, auto_select_mode)
-    is_date_assign_by_bot = False
-    if not target_area is None:
-        is_button_clicked = False
-        for i in range(3):
-            el_btn = None
+        is_target_found_but_not_ready = False
+        for row in all_rows:
             try:
-                my_css_selector = "button.btn"
-                el_btn = target_area.find_element(By.CSS_SELECTOR, my_css_selector)
-            except Exception as exc:
-                pass
-
-            if not el_btn is None:
-                try:
-                    if el_btn.is_enabled():
-                        el_btn.click()
-                        print("buy icon pressed.")
-                        is_button_clicked = True
-                except Exception as exc:
-                    pass
-                    # use plan B
-                    '''
-                    try:
-                        print("force to click by js.")
-                        driver.execute_script("arguments[0].click();", el_btn)
-                        ret = True
-                    except Exception as exc:
-                        pass
-                    '''
-            if is_button_clicked:
-                break
-        is_date_assign_by_bot = is_button_clicked
-
-    else:
-        # no target to click.
-        if auto_reload_coming_soon_page_enable:
-            # auto refresh for date list page.
-            if not formated_area_list is None:
-                if len(formated_area_list) == 0:
-                    try:
-                        driver.refresh()
-                        time.sleep(0.3)
-                    except Exception as exc:
-                        pass
-
-                    if config_dict["advanced"]["auto_reload_page_interval"] > 0:
-                        time.sleep(config_dict["advanced"]["auto_reload_page_interval"])
-
-    return is_date_assign_by_bot
-
-def ibon_area_auto_select(driver, config_dict, area_keyword_item):
-    show_debug_message = True       # debug.
-    show_debug_message = False      # online
-
-    if config_dict["advanced"]["verbose"]:
-        show_debug_message = True
-
-    auto_select_mode = config_dict["area_auto_select"]["mode"]
-
-    # when avaiable seat under this count, check seat text content.
-    CONST_DETECT_SEAT_ATTRIBUTE_UNDER_ROW_COUNT = 20
-
-    is_price_assign_by_bot = False
-    is_need_refresh = False
-
-    area_list = None
-    try:
-        #print("try to find cityline area block")
-        #my_css_selector = "div.col-md-5 > table > tbody > tr[onclick=\"onTicketArea(this.id)\"]"
-        my_css_selector = "div.col-md-5 > table > tbody > tr:not(.disabled)"
-        area_list = driver.find_elements(By.CSS_SELECTOR, my_css_selector)
-    except Exception as exc:
-        print("find #ticket-price-tbl date list fail")
-        print(exc)
-
-    formated_area_list = None
-    if not area_list is None:
-        area_list_count = len(area_list)
-        if show_debug_message:
-            print("area_list_count:", area_list_count)
-            print("area_keyword_item:", area_keyword_item)
-
-        if area_list_count > 0:
-            formated_area_list = []
-            # filter list.
-            for row in area_list:
-                row_text = ""
-                row_html = ""
-                try:
-                    #row_text = row.text
-                    row_html = row.get_attribute('innerHTML')
-                    row_text = util.remove_html_tags(row_html)
-                except Exception as exc:
-                    if show_debug_message:
-                        print(exc)
-                    # error, exit loop
-                    break
-
-                if len(row_text) > 0:
-                    if '已售完' in row_text:
-                        row_text = ""
-
-                    if 'disabled' in row_html:
-                        row_text = ""
-
-                    if 'sold-out' in row_html:
-                        row_text = ""
-
-                # clean the buttom description row.
-                if len(row_text) > 0:
-                    if row_text == "座位已被選擇":
-                        row_text=""
-                    if row_text == "座位已售出":
-                        row_text=""
-                    if row_text == "舞台區域":
-                        row_text=""
-
-                if len(row_text) > 0:
-                    if util.reset_row_text_if_match_keyword_exclude(config_dict, row_text):
-                        row_text = ""
-
-                # check ticket count when amount is few, because of it spent a lot of time at parsing element.
-                if len(row_text) > 0:
-                    is_seat_remaining_checking = False
-                    # PS: when user query with keyword, but when selected row is too many, not every row to check remaing.
-                    #     may cause the matched keyword row ticket seat under user target ticket number.
-                    if auto_select_mode == CONST_FROM_TOP_TO_BOTTOM:
-                        if len(formated_area_list)==0:
-                            is_seat_remaining_checking = True
-
-                    if area_list_count <= CONST_DETECT_SEAT_ATTRIBUTE_UNDER_ROW_COUNT:
-                        is_seat_remaining_checking = True
-
-                    if is_seat_remaining_checking:
-                        try:
-                            area_seat_el = row.find_element(By.CSS_SELECTOR, 'td.action')
-                            if not area_seat_el is None:
-                                seat_text = area_seat_el.text
-                                if seat_text is None:
-                                    seat_text = ""
-                                if seat_text.isdigit():
-                                    seat_int = int(seat_text)
-                                    if seat_int < config_dict["ticket_number"]:
-                                        # skip this row.
-                                        if show_debug_message:
-                                            print("skip not enought ticket number area at row_text:", row_text)
-                                        row_text = ""
-                        except Exception as exc:
-                            if show_debug_message:
-                                print(exc)
-                            pass
-
-                if len(row_text) > 0:
-                    formated_area_list.append(row)
-        else:
-            if show_debug_message:
-                print("area_list_count is empty.")
-            pass
-    else:
-        if show_debug_message:
-            print("area_list_count is None.")
-        pass
-
-    if is_price_assign_by_bot:
-        formated_area_list = None
-
-    matched_blocks = []
-    if not formated_area_list is None:
-        area_list_count = len(formated_area_list)
-        if show_debug_message:
-            print("formated_area_list count:", area_list_count)
-
-        if area_list_count > 0:
-            if len(area_keyword_item) == 0:
-                matched_blocks = formated_area_list
-            else:
-                for row in formated_area_list:
-                    row_text = ""
-                    row_html = ""
-                    try:
-                        #row_text = row.text
-                        row_html = row.get_attribute('innerHTML')
-                        row_text = util.remove_html_tags(row_html)
-                    except Exception as exc:
-                        if show_debug_message:
-                            print(exc)
-                        # error, exit loop
+                date_element = row.find_element(By.CSS_SELECTOR, "p.date")
+                if date_keyword in date_element.text and "已售完" not in row.text:
+                    print(f"  [匹配成功]: '{row.text.strip()}'")
+                    buy_button = row.find_element(By.CSS_SELECTOR, "button.btn-buy")
+                    if buy_button.is_enabled():
+                        print("SUCCESS: 按鈕可點擊，立即執行！")
+                        buy_button.click()
+                        return True
+                    else:
+                        is_target_found_but_not_ready = True
                         break
+            except StaleElementReferenceException:
+                print("  [注意]: 偵測到頁面刷新，跳過一個陳舊的場次元素。")
+                continue
+            except Exception:
+                continue
+        
+        if is_target_found_but_not_ready:
+            if auto_reload_enable:
+                print(f"INFO: 已鎖定目標但尚未開賣，將在 {reload_interval} 秒後刷新...")
+                time.sleep(reload_interval)
+                driver.refresh()
+        else:
+            print(f"ERROR: 遍歷完所有場次，找不到任何包含 '{date_keyword}' 的可購買場次。")
+    except Exception as e:
+        print(f"ERROR: 日期選擇失敗: {e}")
+    return False
 
-                    if len(row_text) > 0:
-                        row_text = util.format_keyword_string(row_text)
-                        if show_debug_message:
-                            print("row_text:", row_text)
+def ibon_area_auto_select(driver, config_dict):
+    """
+    處理選區頁面 (極速JS版)
+    - 先用 Python 找到 Shadow Root，再將搜尋邏輯注入JS高速執行。
+    """
+    wait = WebDriverWait(driver, 10)
+    auto_select_mode = config_dict["area_auto_select"]["mode"]
+    print("\n========== [ibon 流程] 步驟 2: 區域選擇 (極速JS版) ==========")
+    
+    try:
+        # --- 1. 解析關鍵字 ---
+        area_keywords_str = config_dict["area_auto_select"]["area_keyword"].strip()
+        keyword_groups = json.loads(f"[{area_keywords_str}]") if area_keywords_str else [""]
+        print(f"INFO: 已載入搶票志願清單: {keyword_groups}")
 
-                        is_match_area = False
+        # --- 2. 進入 Shadow DOM (此步驟仍需 Python 完成) ---
+        shadow_root = find_shadow_root_by_internal_selector(driver, wait, "table.table")
+        if not shadow_root: 
+            print("ERROR: 找不到選區頁的 Shadow DOM。")
+            return False
 
-                        if len(area_keyword_item) > 0:
-                            # must match keyword.
-                            is_match_area = True
-                            area_keyword_array = area_keyword_item.split(' ')
-                            for area_keyword in area_keyword_array:
-                                area_keyword = util.format_keyword_string(area_keyword)
-                                if not area_keyword in row_text:
-                                    is_match_area = False
-                                    break
-                        else:
-                            # without keyword.
-                            is_match_area = True
+        # --- 3. 定義並執行 JavaScript 加速引擎 ---
+        js_engine = """
+            const shadowRoot = arguments[0];
+            const keywordGroups = arguments[1];
+            const selectMode = arguments[2];
 
-                        if is_match_area:
-                            matched_blocks.append(row)
+            const allRows = shadowRoot.querySelectorAll('table.table > tbody > tr');
+            
+            for (const keywordGroup of keywordGroups) {
+                const requiredWords = keywordGroup.split(' ').filter(w => w);
+                let matchedElements = [];
 
-                            if auto_select_mode == CONST_FROM_TOP_TO_BOTTOM:
-                                break
+                for (const row of allRows) {
+                    const rowText = row.textContent;
+                    if (rowText.includes("已售完")) continue;
 
+                    let allWordsFound = requiredWords.every(word => rowText.includes(word));
+                    
+                    if (allWordsFound) {
+                        matchedElements.push(row);
+                    }
+                }
 
-            if show_debug_message:
-                print("after match keyword, found count:", len(matched_blocks))
+                if (matchedElements.length > 0) {
+                    let targetRow;
+                    if (selectMode === "from top to bottom") {
+                        targetRow = matchedElements[0];
+                    } else if (selectMode === "from bottom to top") {
+                        targetRow = matchedElements[matchedElements.length - 1];
+                    } else { // random or center
+                        targetRow = matchedElements[Math.floor(Math.random() * matchedElements.length)];
+                    }
+                    return targetRow.querySelector("td.action > *");
+                }
+            }
+            return null; // 所有志願都沒找到
+        """
+        
+        target_element = driver.execute_script(js_engine, shadow_root, keyword_groups, auto_select_mode)
+        
+        if target_element:
+            print(f"SUCCESS: JS高速引擎已鎖定目標，執行點擊！")
+            target_element.click()
+            return True
+        else:
+            print("ERROR: JS高速引擎遍歷完所有志願，仍未找到可購買目標。")
 
-    target_area = util.get_target_item_from_matched_list(matched_blocks, auto_select_mode)
-
-    if not matched_blocks is None:
-        if len(matched_blocks) == 0:
-            is_need_refresh = True
-            if show_debug_message:
-                print("matched_blocks is empty, is_need_refresh")
-
-    if not target_area is None:
-        try:
-            if target_area.is_enabled():
-                target_area.click()
-                is_price_assign_by_bot = True
-        except Exception as exc:
-            print("click target_area link fail")
-            print(exc)
-            # use plan B
-            try:
-                print("force to click by js.")
-                driver.execute_script("arguments[0].click();", target_area)
-                is_price_assign_by_bot = True
-            except Exception as exc:
-                pass
-
-    return is_need_refresh, is_price_assign_by_bot
+    except Exception as e:
+        print(f"ERROR: 區域選擇失敗: {e}")
+        
+    return False
 
 def ibon_allow_not_adjacent_seat(driver, config_dict):
     show_debug_message = True       # debug.
@@ -6983,327 +6805,253 @@ def ibon_keyin_captcha_code(driver, answer = "", auto_submit = False):
 
     return is_verifyCode_editing
 
+# --- 輔助函式 (我們之前已建立並驗證) ---
+
+def get_specific_shadow_root(driver, wait, host_selector):
+    """透過一個明確的宿主 CSS Selector 來直接獲取其 Shadow Root。"""
+    try:
+        host_element = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, host_selector)))
+        return host_element.shadow_root
+    except Exception:
+        return None
+
+def find_shadow_root_by_internal_selector(driver, wait, internal_css_selector):
+    """透過遍歷頁面上所有元素，找到包含特定內部選擇器的 Shadow Root。"""
+    try:
+        js_find_host = f"""
+            const allElements = document.querySelectorAll('*');
+            for (const element of allElements) {{
+                if (element.shadowRoot && element.shadowRoot.querySelector('{internal_css_selector}')) {{
+                    return element;
+                }}
+            }}
+            return null;
+        """
+        host_element = wait.until(
+            lambda d: d.execute_script(js_find_host),
+            message=f"逆向探測超時：找不到內部包含 '{internal_css_selector}' 的 Shadow DOM。"
+        )
+        return host_element.shadow_root if host_element else None
+    except Exception:
+        return None
+
 def ibon_auto_ocr(driver, config_dict, ocr, away_from_keyboard_enable, previous_answer, Captcha_Browser, ocr_captcha_image_source, model_name):
-    show_debug_message = True       # debug.
-    show_debug_message = False      # online
+    
+    wait = WebDriverWait(driver, 10)
+    print("\n========== 開始執行 ibon_auto_ocr (路徑搜尋模式) ==========")
 
-    if config_dict["advanced"]["verbose"]:
-        show_debug_message = True
+    try:
+        # --- 1. 找到並進入 Shadow DOM ---
+        host_element_selector = "div#t_captcha" # 根據您的情報，我們直接鎖定這個宿主
+        print(f"INFO: 正在尋找驗證碼的 Shadow DOM 宿主: '{host_element_selector}'")
+        host_element = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, host_element_selector)))
+        
+        shadow_root = get_shadow_root(driver, host_element)
+        if not shadow_root:
+            print("ERROR: 無法進入驗證碼的 Shadow DOM。")
+            return True, previous_answer, False
+        print("SUCCESS: 成功進入驗證碼的 Shadow DOM！")
 
-    print("start to ddddocr")
+        # --- 2. 處理票數選擇 ---
+        # 票數選擇的下拉選單可能不在這個 Shadow DOM 內，所以我們從 driver 開始找
+        try:
+            ticket_dropdown_selector = "select[id$='AMOUNT_DDL']"
+            ticket_select_element = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, ticket_dropdown_selector)))
+            select = Select(ticket_select_element)
+            ticket_num_str = str(config_dict["ticket_number"])
+            select.select_by_value(ticket_num_str)
+            print(f"SUCCESS: 已選擇 {ticket_num_str} 張票。")
+        except Exception as ticket_e:
+            print(f"WARNING: 找不到票數下拉選單，可能在其他 Shadow DOM 或已被移除: {ticket_e}")
 
-    is_need_redo_ocr = False
-    is_form_sumbited = False
 
-    ocr_answer = None
-    if not ocr is None:
-        if show_debug_message:
-            print("away_from_keyboard_enable:", away_from_keyboard_enable)
-            print("previous_answer:", previous_answer)
-            print("ocr_captcha_image_source:", ocr_captcha_image_source)
-
-        ocr_start_time = time.time()
-
+        # --- 3. 處理驗證碼 ---
+        print("INFO: 開始處理驗證碼...")
+        
+        # a. [最終關鍵修改]: 使用 lambda 函式在 Shadow DOM 內部進行智慧等待
+        image_id = 'ctl00_ContentPlaceHolder1_imgCaptcha'
+        print(f"INFO: 在 Shadow DOM 內部等待驗證碼圖片 <img id='{image_id}'> 出現...")
+        
+        # 這行程式碼的意思是：「嘿，WebDriverWait，請你不斷地執行這個小任務：
+        # 用我們已經拿到的 shadow_root 物件，去尋找那個 ID 為 ...imgCaptcha 的圖片。
+        # 請一直重複這個任務，直到找到為止，或者超過你的最大等待時間。」
+        image_element = wait.until(
+            lambda d: shadow_root.find_element(By.ID, image_id)
+        )
+        print("SUCCESS: 成功在 Shadow DOM 內部找到並等待到驗證碼圖片！")
+        
+        # b. 沿用 Base64 處理邏輯
         img_base64 = None
-        if ocr_captcha_image_source == CONST_OCR_CAPTCH_IMAGE_SOURCE_NON_BROWSER:
-            if not Captcha_Browser is None:
-                img_base64 = base64.b64decode(Captcha_Browser.Request_Captcha())
-        if ocr_captcha_image_source == CONST_OCR_CAPTCH_IMAGE_SOURCE_CANVAS:
-            image_id = 'chk_pic'
-            image_element = None
-            try:
-                my_css_selector = "#" + image_id
-                image_element = driver.find_elements(By.CSS_SELECTOR, my_css_selector)
-            except Exception as exc:
-                pass
+        form_verifyCode_base64 = driver.execute_async_script("""
+            var canvas = document.createElement('canvas'); var context = canvas.getContext('2d');
+            var img = arguments[0]; if (!img.complete) return arguments[arguments.length - 1](null);
+            canvas.height = img.naturalHeight; canvas.width = img.naturalWidth;
+            context.drawImage(img, 0, 0); arguments[arguments.length - 1](canvas.toDataURL());
+            """, image_element)
+        
+        if form_verifyCode_base64:
+            img_base64 = base64.b64decode(form_verifyCode_base64.split(',')[1])
 
-            if not image_element is None:
-                try:
-                    driver.set_script_timeout(1)
-                    form_verifyCode_base64 = driver.execute_async_script("""
-                        var canvas = document.createElement('canvas');
-                        var context = canvas.getContext('2d');
-                        var img = document.getElementById('%s');
-                        if(img!=null) {
-                        canvas.height = img.naturalHeight;
-                        canvas.width = img.naturalWidth;
-                        context.drawImage(img, 0, 0);
-                        callback = arguments[arguments.length - 1];
-                        callback(canvas.toDataURL()); }
-                        """ % (image_id))
-                    if not form_verifyCode_base64 is None:
-                        img_base64 = base64.b64decode(form_verifyCode_base64.split(',')[1])
-                except Exception as exc:
-                    if show_debug_message:
-                        print("canvas exception:", str(exc))
-                    pass
-        if not img_base64 is None:
-            try:
-                ocr_answer = ocr.classification(img_base64)
-            except Exception as exc:
-                pass
+        # c. OCR 辨識
+        ocr_answer = ocr.classification(img_base64) if img_base64 and ocr else ""
+        print(f"SUCCESS: OCR 辨識結果: {ocr_answer}")
+        
+        # d. 找到輸入框並填寫
+        if len(ocr_answer) >= 3:
+            captcha_input_selector = "input#ctl00_ContentPlaceHolder1_CHK"
+            captcha_input = driver.find_element(By.CSS_SELECTOR, captcha_input_selector) # 輸入框通常也在主頁面
+            captcha_input.send_keys(ocr_answer)
+            print(f"SUCCESS: 已將 '{ocr_answer}' 自動填入驗證碼。")
+            return False, ocr_answer, True 
 
-        ocr_done_time = time.time()
-        ocr_elapsed_time = ocr_done_time - ocr_start_time
-        print("ocr elapsed time:", "{:.3f}".format(ocr_elapsed_time))
-    else:
-        print("ddddocr is None")
+    except Exception as e:
+        print(f"ERROR: 處理驗證碼頁面時失敗: {e}")
 
-    if not ocr_answer is None:
-        ocr_answer = ocr_answer.strip()
-        print("ocr_answer:", ocr_answer)
-        if len(ocr_answer)==4:
-            who_care_var = ibon_keyin_captcha_code(driver, answer = ocr_answer, auto_submit = away_from_keyboard_enable)
-        else:
-            if not away_from_keyboard_enable:
-                ibon_keyin_captcha_code(driver)
+    return True, previous_answer, False
+
+def ibon_ocr_captcha_handler(driver, ocr):
+    """處理圖片式驗證碼 (逆向探測 + OCR)"""
+    wait = WebDriverWait(driver, 10)
+    print("\n--- INFO: 開始處理圖片式驗證碼 (實戰模式)... ---")
+    if not ocr:
+        print("ERROR: ddddocr 模組未初始化。")
+        return False
+        
+    try:
+        shadow_root = find_shadow_root_by_internal_selector(driver, wait, "img")
+        if not shadow_root: 
+            print("ERROR: 逆向探測失敗，找不到驗證碼的 Shadow Root。")
+            return False
+        print("SUCCESS: 成功進入驗證碼的 Shadow DOM！")
+
+        captcha_image = shadow_root.find_element(By.CSS_SELECTOR, "img")
+        img_base64_data = driver.execute_async_script("""
+            var canvas = document.createElement('canvas');
+            var context = canvas.getContext('2d');
+            var img = arguments[0];
+            if (!img.complete || typeof img.naturalWidth == "undefined" || img.naturalWidth == 0) {
+                arguments[arguments.length - 1](null);
+                return;
+            }
+            canvas.height = img.naturalHeight;
+            canvas.width = img.naturalWidth;
+            context.drawImage(img, 0, 0);
+            arguments[arguments.length - 1](canvas.toDataURL('image/png'));
+            """, captcha_image)
+
+        if not img_base64_data:
+            print("ERROR: 無法獲取驗證碼圖片的 Base64 資料。")
+            return False
+
+        img_bytes = base64.b64decode(img_base64_data.split(',')[1])
+        ocr_answer = ocr.classification(img_bytes)
+        print(f"SUCCESS: OCR 辨識結果: {ocr_answer}")
+
+        answer_input = driver.find_element(By.CSS_SELECTOR, "input[name$='CHK']")
+        answer_input.clear()
+        answer_input.send_keys(ocr_answer)
+        print(f"SUCCESS: 已將 '{ocr_answer}' 自動填入驗證碼。")
+        
+        return True
+    except Exception as e:
+        print(f"ERROR: OCR 驗證碼處理失敗: {e}")
+        return False
+
+def ibon_final_page_handler(driver, config_dict, ocr):
+    """處理最終的票數與驗證碼頁面 (最終勝利版)"""
+    wait = WebDriverWait(driver, 10)
+    print("\n========== [ibon 流程] 步驟 3: 最終確認頁 ==========")
+    try:
+        # 步驟 3.1: 選擇票數
+        ticket_selector = "select[id$='AMOUNT_DDL']"
+        is_ticket_number_assigned = assign_ticket_number_by_select(driver, config_dict, By.CSS_SELECTOR, ticket_selector)
+        
+        if is_ticket_number_assigned:
+            print("SUCCESS: 已成功選擇票券張數！")
+            
+            # 步驟 3.2: 處理圖片驗證碼
+            is_captcha_success = False
+            max_retries = 5
+            for i in range(max_retries):
+                print(f"--- 第 {i+1}/{max_retries} 次嘗試處理驗證碼 ---")
+                if ibon_ocr_captcha_handler(driver, ocr):
+                    is_captcha_success = True
+                    break
+                if i < max_retries - 1:
+                    print("WARNING: 本次驗證碼處理失敗，點擊刷新後重試...")
+                    try:
+                        driver.find_element(By.CSS_SELECTOR, "img[src*='refresh-button']").click()
+                        time.sleep(1)
+                    except Exception as e:
+                        print(f"ERROR: 點擊刷新按鈕失敗: {e}, 改為刷新整個頁面。")
+                        driver.refresh()
+                        time.sleep(2)
+
+            # [最終勝利] 步驟 3.3: 發動 JavaScript 強制點擊
+            if is_captcha_success:
+                print("INFO: 驗證碼處理完成，準備對最終按鈕發動「雙重突入」...")
+                
+                button_host_selector = "div#Next > div"
+                button_shadow_root = get_specific_shadow_root(driver, wait, button_host_selector)
+                
+                if button_shadow_root:
+                    print("SUCCESS: 已突入最終按鈕的 Shadow DOM！")
+                    final_button_selector = "a.btn.btn-primary"
+                    final_button = WebDriverWait(button_shadow_root, 5).until(EC.element_to_be_clickable((By.CSS_SELECTOR, final_button_selector)))
+                    print(f"INFO: 鎖定最終按鈕 '{final_button.text}'，執行 JavaScript 強制點擊！")
+                    
+                    # 使用我們的王牌武器：JavaScript 強制點擊
+                    driver.execute_script("arguments[0].click();", final_button)
+
+                    print("SUCCESS: 已送出最終點擊指令！搶票成功！🎉")
+                    play_sound_while_ordering(config_dict)
+                    return True
+                else:
+                    print("ERROR: 雙重突入失敗，找不到最終按鈕的 Shadow DOM。")
             else:
-                is_need_redo_ocr = True
-                if previous_answer != ocr_answer:
-                    previous_answer = ocr_answer
-                    print("click captcha again")
-                    if True:
-                        # selenium solution.
-                        jquery_string = '$("#chk_pic").attr("src", "/pic.aspx?TYPE=%s&ts=" + new Date().getTime());' % (model_name)
-                        driver.execute_script(jquery_string)
-
-                        if ocr_captcha_image_source == CONST_OCR_CAPTCH_IMAGE_SOURCE_CANVAS:
-                            time.sleep(0.3)
-                    else:
-                        # Non_Browser solution.
-                        if not Captcha_Browser is None:
-                            new_captcha_url = Captcha_Browser.Request_Refresh_Captcha() #取得新的CAPTCHA
-                            if new_captcha_url != "":
-                                #PS:[TODO]
-                                #tixcraft_change_captcha(driver, new_captcha_url) #更改CAPTCHA圖
-                                pass
-    else:
-        print("ocr_answer is None")
-        print("previous_answer:", previous_answer)
-        if previous_answer is None:
-            ibon_keyin_captcha_code(driver)
+                print("ERROR: 連續多次處理驗證碼失敗，放棄本次流程。")
         else:
-            # page is not ready, retry again.
-            # PS: usually occur in async script get captcha image.
-            is_need_redo_ocr = True
-
-    return is_need_redo_ocr, previous_answer, is_form_sumbited
-
-def ibon_captcha(driver, config_dict, ocr, Captcha_Browser, model_name):
-    away_from_keyboard_enable = config_dict["ocr_captcha"]["force_submit"]
-    if not config_dict["ocr_captcha"]["enable"]:
-        away_from_keyboard_enable = False
-    ocr_captcha_image_source = config_dict["ocr_captcha"]["image_source"]
-
-    #PS: need a 'auto assign seat' feature to enable away_from_keyboard feature.
-    away_from_keyboard_enable = False
-
-    is_captcha_sent = False
-    previous_answer = None
-    last_url, is_quit_bot = get_current_url(driver)
-    for redo_ocr in range(19):
-        is_need_redo_ocr, previous_answer, is_form_sumbited = ibon_auto_ocr(driver, config_dict, ocr, away_from_keyboard_enable, previous_answer, Captcha_Browser, ocr_captcha_image_source, model_name)
-
-        # TODO: must ensure the answer is corrent...
-        if not is_need_redo_ocr:
-            is_captcha_sent = True
-
-        if is_form_sumbited:
-            break
-
-        if not away_from_keyboard_enable:
-            break
-
-        if not is_need_redo_ocr:
-            break
-
-        current_url, is_quit_bot = get_current_url(driver)
-        if current_url != last_url:
-            break
-
-    return is_captcha_sent
+            print("WARNING: 未能成功選擇票券張數。")
+            
+    except Exception as e:
+        print(f"ERROR: 最終確認頁面處理失敗: {e}")
+    return False
 
 def ibon_main(driver, url, config_dict, ocr, Captcha_Browser):
-    global ibon_dict
-    if not 'ibon_dict' in globals():
-        ibon_dict = {}
-        ibon_dict["fail_list"]=[]
-        ibon_dict["start_time"]=None
-        ibon_dict["done_time"]=None
-        ibon_dict["elapsed_time"]=None
+    """ibon 網站的總控制器 (基於 URL 參數的精準判斷)"""
+    
+    # [復活的舊版智慧] 使用精準的 URL 參數來判斷頁面狀態
+    
+    # 判斷邏輯 1: 日期選擇頁 (最先的頁面)
+    if '/activityinfo/details/' in url.lower():
+        ibon_date_auto_select(driver, config_dict)
+    
+    # 判斷邏輯 2: 帶有 PERFORMANCE_PRICE_AREA_ID 的頁面，是最終的票數+驗證碼頁
+    elif 'PERFORMANCE_PRICE_AREA_ID=' in url.upper():
+        ibon_final_page_handler(driver, config_dict, ocr)
 
-    home_url_list = ['https://ticket.ibon.com.tw/'
-    ,'https://ticket.ibon.com.tw/index/entertainment'
-    ]
-    for each_url in home_url_list:
-        if each_url == url.lower():
-            if config_dict["ocr_captcha"]["enable"]:
-                set_non_browser_cookies(driver, url, Captcha_Browser)
-            break
+    # 判斷邏輯 3: 帶有 PRODUCT_ID 但不帶有 PRICE_AREA_ID 的頁面，是區域選擇頁
+    elif 'PRODUCT_ID=' in url.upper():
+        ibon_area_auto_select(driver, config_dict)
+    
+    # 判斷邏輯 4: utk0202 也是一個可能的最終頁面 URL 結構
+    elif '/utk02/utk0202' in url.lower():
+        ibon_final_page_handler(driver, config_dict, ocr)
 
-    # https://tour.ibon.com.tw/event/e23010000300mxu
-    if 'tour' in url.lower() and '/event/' in url.lower():
-        is_event_page = False
-        if len(url.split('/'))==5:
-            is_event_page = True
-        if is_event_page:
-            # ibon auto press signup
-            is_button_clicked = press_button(driver, By.CSS_SELECTOR, '.btn.btn-signup')
-
-    is_match_target_feature = False
-
-    #PS: ibon some utk is upper case, some is lower.
-    if not is_match_target_feature:
-        #https://ticket.ibon.com.tw/ActivityInfo/Details/0000?pattern=entertainment
-        if '/activityinfo/details/' in url.lower():
-            is_event_page = False
-            if len(url.split('/'))==6:
-                is_event_page = True
-
-            if is_event_page:
-                if config_dict["date_auto_select"]["enable"]:
-                    is_match_target_feature = True
-                    is_date_assign_by_bot = ibon_date_auto_select(driver, config_dict)
-
-    if 'ibon.com.tw/error.html?' in url.lower():
-        try:
-            driver.back()
-        except Exception as exc:
-            pass
-
-    is_enter_verify_mode = False
-    if not is_match_target_feature:
-        # validation question url:
-        # https://orders.ibon.com.tw/application/UTK02/UTK0201_0.aspx?rn=1180872370&PERFORMANCE_ID=B04M7XZT&PRODUCT_ID=B04KS88E&SHOW_PLACE_MAP=True
-        is_event_page = False
-        if '/UTK02/UTK0201_0.' in url.upper():
-            if '.aspx?' in url.lower():
-                if 'rn=' in url.lower():
-                    if 'PERFORMANCE_ID=' in url.upper():
-                        if "PRODUCT_ID=" in url.upper():
-                            is_event_page = True
-
-        if is_event_page:
-            is_enter_verify_mode = True
-            ibon_dict["fail_list"] = ibon_verification_question(driver, ibon_dict["fail_list"], config_dict)
-            is_match_target_feature = True
-
-    if not is_enter_verify_mode:
-        ibon_dict["fail_list"] = []
-
-    if not is_match_target_feature:
-        # https://orders.ibon.com.tw/application/UTK02/UTK0201_000.aspx?PERFORMANCE_ID=0000
-        # https://orders.ibon.com.tw/application/UTK02/UTK0201_000.aspx?rn=1111&PERFORMANCE_ID=2222&PRODUCT_ID=BBBB
-        # https://orders.ibon.com.tw/application/UTK02/UTK0201_001.aspx?PERFORMANCE_ID=2222&GROUP_ID=4&PERFORMANCE_PRICE_AREA_ID=3333
-
-        is_event_page = False
-        if '/UTK02/UTK0201_' in url.upper():
-            if '.aspx?' in url.lower():
-                if 'PERFORMANCE_ID=' in url.upper():
-                    if len(url.split('/'))==6:
-                        is_event_page = True
-
-        if '/UTK02/UTK0202_' in url.upper():
-            if '.aspx?' in url.lower():
-                if 'PERFORMANCE_ID=' in url.upper():
-                    if len(url.split('/'))==6:
-                        is_event_page = True
-
-        if is_event_page:
-            if config_dict["area_auto_select"]["enable"]:
-                select_query = "tr.disbled"
-                clean_tag_by_selector(driver,select_query)
-                select_query = "tr.sold-out"
-                clean_tag_by_selector(driver,select_query)
-
-                is_do_ibon_performance_with_ticket_number = False
-
-                if 'PRODUCT_ID=' in url.upper():
-                    # step 1: select area.
-                    is_match_target_feature = True
-                    is_price_assign_by_bot = ibon_performance(driver, config_dict)
-                    #print("is_price_assign_by_bot:", is_price_assign_by_bot)
-                    if not is_price_assign_by_bot:
-                        # this case show captcha and ticket-number in this page.
-                        if ibon_ticket_number_appear(driver, config_dict):
-                            is_do_ibon_performance_with_ticket_number = True
-
-                if 'PERFORMANCE_PRICE_AREA_ID=' in url.upper():
-                    is_do_ibon_performance_with_ticket_number = True
-
-                if is_do_ibon_performance_with_ticket_number:
-                    if config_dict["advanced"]["disable_adjacent_seat"]:
-                        is_finish_checkbox_click = ibon_allow_not_adjacent_seat(driver, config_dict)
-
-                    # captcha
-                    is_captcha_sent = False
-                    if config_dict["ocr_captcha"]["enable"]:
-                        domain_name = url.split('/')[2]
-                        model_name = url.split('/')[5]
-                        if len(model_name) > 7:
-                            model_name=model_name[:7]
-                        captcha_url = '/pic.aspx?TYPE=%s' % (model_name)
-                        #PS: need set cookies once, if user change domain.
-                        if not Captcha_Browser is None:
-                            Captcha_Browser.Set_Domain(domain_name, captcha_url=captcha_url)
-
-                        is_captcha_sent = ibon_captcha(driver, config_dict, ocr, Captcha_Browser, model_name)
-
-                    # assign ticket number.
-                    is_match_target_feature = True
-                    is_ticket_number_assigned = ibon_ticket_number_auto_select(driver, config_dict)
-                    #print("is_ticket_number_assigned:", is_ticket_number_assigned)
-                    if is_ticket_number_assigned:
-                        if is_captcha_sent:
-                            click_ret = ibon_purchase_button_press(driver)
-
-                            # only this case: "ticket number CHANGED by bot" and "cpatcha sent" to play sound!
-                            if click_ret:
-                                play_sound_while_ordering(config_dict)
-                    else:
-                        is_sold_out = ibon_check_sold_out(driver)
-                        if is_sold_out:
-                            print("is_sold_out, go back , and refresh.")
-                            # plan-A
-                            #is_button_clicked = press_button(driver, By.CSS_SELECTOR, 'a.btn.btn-primary')
-                            # plan-B, easy and better than plan-A
-                            try:
-                                driver.back()
-                                driver.refresh()
-                            except Exception as exc:
-                                pass
-
-
-    if not is_match_target_feature:
-        #https://orders.ibon.com.tw/application/UTK02/UTK0206_.aspx
-        is_event_page = False
-        if '/UTK02/UTK020' in url.upper():
-            if '.aspx' in url.lower():
-                if len(url.split('/'))==6:
-                    is_event_page = True
-
-        # ignore "pay money" step.
-        if '/UTK02/UTK0207_.ASPX' in url.upper():
-            is_event_page = False
-
-        if is_event_page:
-            if is_event_page:
-                is_match_target_feature = True
-                is_finish_checkbox_click = ibon_ticket_agree(driver)
-                if is_finish_checkbox_click:
-                    is_name_based = False
-                    try:
-                        my_css_selector = "body"
-                        html_body = driver.find_element(By.CSS_SELECTOR, my_css_selector)
-                        if not html_body is None:
-                            if '實名制' in html_body.text:
-                                is_name_based = True
-                    except Exception as exc:
-                        pass
-
-                    if not is_name_based:
-                        is_button_clicked = press_button(driver, By.CSS_SELECTOR, 'a.btn.btn-pink.continue')
-
+    # 判斷邏輯 5: UTK0206 是「同意條款」頁，在搶票成功後出現
+    elif '/utk02/utk0206' in url.lower():
+        print("INFO: 偵測到「同意條款」頁，代表已進入結帳流程，暫停自動操作。")
+        # 在這裡可以選擇讓程式停下來，或自動勾選同意並繼續
+        # is_finish_checkbox_click = check_checkbox(driver, By.CSS_SELECTOR, '#agreen')
+        # press_button(driver, By.CSS_SELECTOR, 'a.btn.btn-pink.continue')
+    
+    # 判斷邏輯 6: 保留舊有的生日驗證等初步驗證頁面
+    elif '/utk02/utk0201_0.' in url.lower() and 'rn=' in url.lower():
+        print("\n========== [ibon 流程] 偵測到初步驗證問題 ==========")
+        # ibon_verification_question(driver, config_dict)
+            
+    else:
+        print(f"INFO: 當前 ibon URL 未匹配任何已知處理流程。")
 
 def hkticketing_accept_cookie(driver):
     show_debug_message = True    # debug.
@@ -8778,11 +8526,10 @@ def kham_switch_to_auto_seat(driver):
     if not btn_switch_to_auto_seat is None:
         button_class_string = None
         try:
-            button_class_string = form_verifyCode.get_attribute('class')
+            button_class_string = btn_switch_to_auto_seat.get_attribute('class')
         except Exception as exc:
             #print("get_attribute('class') fail")
             pass
-
         if button_class_string is None:
             button_class_string = ""
 
@@ -8816,11 +8563,10 @@ def ticket_switch_to_auto_seat(driver):
     if not btn_switch_to_auto_seat is None:
         button_class_string = None
         try:
-            button_class_string = form_verifyCode.get_attribute('checked')
+            button_class_string = btn_switch_to_auto_seat.get_attribute('checked')
         except Exception as exc:
             #print("get_attribute('class') fail")
             pass
-
         if button_class_string is None:
             button_class_string = ""
 
@@ -10865,9 +10611,10 @@ def resize_window(driver, config_dict):
             driver.set_window_position(position_left, 30)
 
 
-def main(args):
-    config_dict = get_config_dict(args)
 
+def main(args):
+    # 步驟 1: 初始化 Config 和 Driver (保持不變)
+    config_dict = get_config_dict(args)
     driver = None
     if not config_dict is None:
         driver = get_driver_by_config(config_dict)
@@ -10879,11 +10626,33 @@ def main(args):
             sys.exit()
     else:
         print("Load config error!")
+        return # 加上 return 避免後續程式碼在 config_dict 為 None 時出錯
 
-    # internal variable. 說明：這是一個內部變數，請略過。
-    url = ""
-    last_url = ""
+    # [關鍵優化 1] 將 CDP 全局注入腳本移到這裡，只執行一次
+    js_to_force_open_shadow_dom = """
+    (function() {
+      const _attach = Element.prototype.attachShadow;
+      Element.prototype.attachShadow = function(init) {
+        if(init && init.mode === 'closed'){
+          init.mode = 'open';
+        }
+        return _attach.call(this, init);
+      };
+    })();
+    """
+    try:
+        print("INFO: 使用 CDP 進行一次性全局腳本注入...")
+        driver.execute_cdp_cmd(
+            "Page.addScriptToEvaluateOnNewDocument",
+            {"source": js_to_force_open_shadow_dom}
+        )
+        print("SUCCESS: 破解腳本已全局設定，後續所有頁面將自動生效，無需刷新。")
+    except Exception as e:
+        print(f"ERROR: 全局腳本注入失敗: {e}")
+        driver.quit()
+        return
 
+    # 初始化 OCR 等工具 (保持不變)
     ocr = None
     Captcha_Browser = None
     try:
@@ -10896,19 +10665,29 @@ def main(args):
         print(exc)
         pass
 
+    # 初始化內部變數 (保持不變)
     maxbot_last_reset_time = time.time()
     is_quit_bot = False
+    
+    # 第一次導航
+    driver.get(config_dict["homepage"])
+
+    # 進入乾淨、高速的主迴圈
+    last_url = ""
     while True:
         time.sleep(0.05)
-
-        # pass if driver not loaded.
+        # [關鍵升級] 將「暫停檢查」放在迴圈的最頂端
+        if os.path.exists(CONST_MAXBOT_INT28_FILE):
+            # 如果暫停檔案存在，就印出訊息並跳過本次迴圈的所有操作
+            print("偵測到暫停指令，已暫停搶票流程...", end='\r')
+            time.sleep(1) # 暫停時可以睡久一點，降低CPU使用
+            continue
         if driver is None:
             print("web driver not accessible!")
             break
 
         if not is_quit_bot:
             url, is_quit_bot = get_current_url(driver)
-            #print("url:", url)
 
         if is_quit_bot:
             try:
@@ -10918,51 +10697,40 @@ def main(args):
                 pass
             break
 
-        if url is None:
+        if url is None or len(url) == 0:
             continue
-        else:
-            if len(url) == 0:
-                continue
 
-        is_maxbot_paused = False
-        if os.path.exists(CONST_MAXBOT_INT28_FILE):
-            is_maxbot_paused = True
-
-        if len(url) > 0 :
-            if url != last_url:
-                print(url)
-                write_last_url_to_file(url)
-                if is_maxbot_paused:
-                    print("MAXBOT Paused.")
-            last_url = url
-
+        # 暫停邏輯 (保持不變)
+        is_maxbot_paused = os.path.exists(CONST_MAXBOT_INT28_FILE)
         if is_maxbot_paused:
-            if 'kktix.c' in url:
-                kktix_paused_main(driver, url, config_dict)
-            # sleep more when paused.
-            time.sleep(0.1)
+            if url != last_url:
+                print(f"MAXBOT Paused. Current URL: {url}")
+                last_url = url
+            time.sleep(1)
             continue
+        
+        # [關鍵優化 2] 刪除此處舊的、會造成延遲的重複注入與刷新邏輯
+        # 由於我們已經在迴圈外進行了一次性全局注入，這裡不再需要任何判斷和操作
+        if url != last_url:
+            print(f"URL changed to: {url}")
+            write_last_url_to_file(url)
+        last_url = url
 
+        # 瀏覽器重置邏輯 (保持不變)
         if config_dict["advanced"]["reset_browser_interval"] > 0:
             maxbot_running_time = time.time() - maxbot_last_reset_time
             if maxbot_running_time > config_dict["advanced"]["reset_browser_interval"]:
                 driver = reset_webdriver(driver, config_dict, url)
                 maxbot_last_reset_time = time.time()
-
+        
+        # --- 所有網站的指揮中心 (保持不變) ---
         tixcraft_family = False
-        if 'tixcraft.com' in url:
+        if 'tixcraft.com' in url or 'indievox.com' in url or 'ticketmaster.' in url:
             tixcraft_family = True
-
-        if 'indievox.com' in url:
-            tixcraft_family = True
-
-        if 'ticketmaster.' in url:
-            tixcraft_family = True
-
+        
         if tixcraft_family:
             is_quit_bot = tixcraft_main(driver, url, config_dict, ocr, Captcha_Browser)
 
-        # for kktix.cc and kktix.com
         if 'kktix.c' in url:
             is_quit_bot = kktix_main(driver, url, config_dict)
 
@@ -10973,13 +10741,7 @@ def main(args):
             ibon_main(driver, url, config_dict, ocr, Captcha_Browser)
 
         kham_family = False
-        if 'kham.com.tw' in url:
-            kham_family = True
-
-        if 'ticket.com.tw' in url:
-            kham_family = True
-
-        if 'tickets.udnfunlife.com' in url:
+        if 'kham.com.tw' in url or 'ticket.com.tw' in url or 'tickets.udnfunlife.com' in url:
             kham_family = True
 
         if kham_family:
@@ -10995,18 +10757,14 @@ def main(args):
             cityline_main(driver, url, config_dict)
 
         softix_family = False
-        if 'hkticketing.com' in url:
+        if 'hkticketing.com' in url or 'galaxymacau.com' in url or 'ticketek.com' in url:
             softix_family = True
-        if 'galaxymacau.com' in url:
-            softix_family = True
-        if 'ticketek.com' in url:
-            softix_family = True
+            
         if softix_family:
             softix_powerweb_main(driver, url, config_dict)
 
-        # for facebook signin
         facebook_login_url = 'https://www.facebook.com/login.php?'
-        if url[:len(facebook_login_url)]==facebook_login_url:
+        if url.startswith(facebook_login_url):
             facebook_main(driver, config_dict)
 
 def cli():
