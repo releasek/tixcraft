@@ -1990,3 +1990,79 @@ def launch_maxbot(script_name="chrome_tixcraft", filename="", homepage="", kktix
                 msg=str(exc)
                 print("exeption:", msg)
                 pass
+
+
+
+#----打包executable的程式碼----
+# import os
+# import sys
+# import platform
+# import subprocess
+
+# def launch_maxbot(
+#     script_name="chrome_tixcraft",
+#     filename="",
+#     homepage="",
+#     kktix_account="",
+#     kktix_password="",
+#     window_size="",
+#     headless=""
+# ):
+#     """
+#     啟動主搶票程式。修正打包後的路徑問題。
+#     """
+#     cmd_argument = []
+#     # --- 參數組合 (保持不變) ---
+#     if filename:        cmd_argument.append('--input=' + filename)
+#     if homepage:        cmd_argument.append('--homepage=' + homepage)
+#     if kktix_account:   cmd_argument.append('--kktix_account=' + kktix_account)
+#     if kktix_password:  cmd_argument.append('--kktix_password=' + kktix_password)
+#     if window_size:     cmd_argument.append('--window_size=' + window_size)
+#     if headless:        cmd_argument.append('--headless=' + headless)
+
+#     # --- [關鍵修正] 判斷執行環境，取得正確的路徑 ---
+#     if hasattr(sys, 'frozen'):
+#         print("execute in frozen mode")
+#         working_dir = os.path.dirname(sys.executable)
+#         worker_exe_path = os.path.join(working_dir, f"{script_name}.exe")
+
+#         # 新增詳細debug資訊
+#         print(f"🟩 sys.executable = {sys.executable}")
+#         print(f"🟩 working_dir = {working_dir}")
+#         print(f"🟩 worker_exe_path = {worker_exe_path}")
+#         print(f"🟩 cmd_argument = {cmd_argument}")
+
+#         if not os.path.exists(worker_exe_path):
+#             print(f"❌ ERROR: 在 {working_dir} 中找不到 {worker_exe_path}")
+#             return
+
+#         # 使用 list 格式，參數安全不被吃掉
+#         command = [worker_exe_path] + cmd_argument
+#         print(f"INFO (util.launch_maxbot): 準備執行指令: {command}")
+
+#         # Windows 下開新 console 視窗
+#         creationflags = subprocess.CREATE_NEW_CONSOLE if platform.system() == 'Windows' else 0
+#         try:
+#             subprocess.Popen(command, cwd=working_dir, creationflags=creationflags)
+#             print(f"🟢 已成功呼叫 {worker_exe_path}")
+#         except Exception as e:
+#             print(f"❌ 呼叫 {worker_exe_path} 失敗: {e}")
+
+#     else:
+#         # --- 開發環境下的原始邏輯 (保持不變) ---
+#         working_dir = os.path.dirname(os.path.realpath(__file__))
+#         interpreter_binary = 'python3' if platform.system() != 'Windows' else 'python'
+#         interpreter_binary_alt = 'python' if platform.system() != 'Windows' else 'python3'
+#         try:
+#             cmd_array = [interpreter_binary, script_name + '.py'] + cmd_argument
+#             subprocess.Popen(cmd_array, cwd=working_dir)
+#         except Exception as exc:
+#             print('try', interpreter_binary_alt)
+#             try:
+#                 cmd_array = [interpreter_binary_alt, script_name + '.py'] + cmd_argument
+#                 subprocess.Popen(cmd_array, cwd=working_dir)
+#             except Exception as exc:
+#                 print("exception:", exc)
+
+# if __name__ == "__main__":
+#     launch_maxbot()

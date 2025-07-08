@@ -1,0 +1,118 @@
+[2025-07-04 16:27:05] [Log] 進入 tixcraft_ticket_main（Tixcraft 票務主流程）
+[2025-07-04 16:27:05] [Log] Chrome extension 未啟用，需程式自動勾選同意
+[2025-07-04 16:27:05] [Log] 呼叫 tixcraft_ticket_main_agree，嘗試自動勾選同意條款
+[2025-07-04 16:27:05] [Log] 第 1 次嘗試勾選同意框
+[2025-07-04 16:27:05] [Log] 找到checkbox, 是否顯示: True, 是否啟用: True, 是否已選: False
+[2025-07-04 16:27:05] [Log] checkbox HTML:<input type="checkbox" id="TicketForm_agree" class="form-check-input" name="TicketForm[agree]" value="1">
+[2025-07-04 16:27:05] [Log] 嘗試點擊 checkbox
+[2025-07-04 16:27:05] [Log] 勾選成功，跳出回圈
+[2025-07-04 16:27:05] [Log] 勾選同意條款流程結束
+[2025-07-04 16:27:05] [Log] 執行 tixcraft_assign_ticket_number，準備選擇票數
+[2025-07-04 16:27:05] [Log] 票數指派結果：is_ticket_number_assigned=False
+[2025-07-04 16:27:05] [Log] 尚未選到票數，嘗試用 ticket_number_select_fill 填入票數
+[2025-07-04 16:27:05] [Log] ticket_number_select_fill 結果：is_ticket_number_assigned=True
+[2025-07-04 16:27:05] [Log] 已選到票數，開始驗證碼處理
+[2025-07-04 16:27:08] [Log] tixcraft_ticket_main_ocr 執行完成
+[2025-07-04 16:27:08] [Log] 進入 tixcraft_ticket_main（Tixcraft 票務主流程）
+[2025-07-04 16:27:08] [Log] Chrome extension 未啟用，需程式自動勾選同意
+[2025-07-04 16:27:08] [Log] 呼叫 tixcraft_ticket_main_agree，嘗試自動勾選同意條款
+[2025-07-04 16:27:08] [Log] 第 1 次嘗試勾選同意框
+[2025-07-04 16:27:08] [Log] 找到checkbox, 是否顯示: True, 是否啟用: True, 是否已選: False
+[2025-07-04 16:27:08] [Log] checkbox HTML:<input type="checkbox" id="TicketForm_agree" class="form-check-input" name="TicketForm[agree]" value="1">
+[2025-07-04 16:27:08] [Log] 嘗試點擊 checkbox
+[2025-07-04 16:27:08] [Log] 勾選成功，跳出回圈
+[2025-07-04 16:27:08] [Log] 勾選同意條款流程結束
+[2025-07-04 16:27:08] [Log] 執行 tixcraft_assign_ticket_number，準備選擇票數
+[2025-07-04 16:27:08] [Log] 票數指派結果：is_ticket_number_assigned=False
+[2025-07-04 16:27:08] [Log] 尚未選到票數，嘗試用 ticket_number_select_fill 填入票數
+[2025-07-04 16:27:08] [Log] ticket_number_select_fill 結果：is_ticket_number_assigned=True
+[2025-07-04 16:27:08] [Log] 已選到票數，開始驗證碼處理
+[2025-07-04 16:27:11] [Log] tixcraft_ticket_main_ocr 執行完成
+[2025-07-04 16:27:11] [Log] 進入 tixcraft_ticket_main（Tixcraft 票務主流程）
+[2025-07-04 16:27:11] [Log] Chrome extension 未啟用，需程式自動勾選同意
+[2025-07-04 16:27:11] [Log] 呼叫 tixcraft_ticket_main_agree，嘗試自動勾選同意條款
+[2025-07-04 16:27:11] [Log] 第 1 次嘗試勾選同意框
+[2025-07-04 16:27:11] [Log] 找到checkbox, 是否顯示: True, 是否啟用: True, 是否已選: False
+[2025-07-04 16:27:11] [Log] checkbox HTML:<input type="checkbox" id="TicketForm_agree" class="form-check-input" name="TicketForm[agree]" value="1">
+[2025-07-04 16:27:11] [Log] 嘗試點擊 checkbox
+[2025-07-04 16:27:11] [Log] 勾選成功，跳出回圈
+[2025-07-04 16:27:11] [Log] 勾選同意條款流程結束
+[2025-07-04 16:27:11] [Log] 執行 tixcraft_assign_ticket_number，準備選擇票數
+[2025-07-04 16:27:12] [Log] 票數指派結果：is_ticket_number_assigned=False
+[2025-07-04 16:27:12] [Log] 尚未選到票數，嘗試用 ticket_number_select_fill 填入票數
+[2025-07-04 16:27:12] [Log] ticket_number_select_fill 結果：is_ticket_number_assigned=True
+[2025-07-04 16:27:12] [Log] 已選到票數，開始驗證碼處理
+[2025-07-04 16:27:14] [Log] tixcraft_ticket_main_ocr 執行完成
+[2025-07-04 16:27:14] [Log] 進入 tixcraft_ticket_main（Tixcraft 票務主流程）
+[2025-07-04 16:27:14] [Log] Chrome extension 未啟用，需程式自動勾選同意
+[2025-07-04 16:27:14] [Log] 呼叫 tixcraft_ticket_main_agree，嘗試自動勾選同意條款
+[2025-07-04 16:27:14] [Log] 第 1 次嘗試勾選同意框
+[2025-07-04 16:27:14] [Log] 找到checkbox, 是否顯示: True, 是否啟用: True, 是否已選: False
+[2025-07-04 16:27:14] [Log] checkbox HTML:<input type="checkbox" id="TicketForm_agree" class="form-check-input" name="TicketForm[agree]" value="1">
+[2025-07-04 16:27:14] [Log] 嘗試點擊 checkbox
+[2025-07-04 16:27:14] [Log] 勾選成功，跳出回圈
+[2025-07-04 16:27:14] [Log] 勾選同意條款流程結束
+[2025-07-04 16:27:14] [Log] 執行 tixcraft_assign_ticket_number，準備選擇票數
+[2025-07-04 16:27:14] [Log] 票數指派結果：is_ticket_number_assigned=False
+[2025-07-04 16:27:14] [Log] 尚未選到票數，嘗試用 ticket_number_select_fill 填入票數
+[2025-07-04 16:27:15] [Log] ticket_number_select_fill 結果：is_ticket_number_assigned=True
+[2025-07-04 16:27:15] [Log] 已選到票數，開始驗證碼處理
+[2025-07-04 16:27:17] [Log] tixcraft_ticket_main_ocr 執行完成
+[2025-07-04 16:46:27] [Log] 進入 tixcraft_ticket_main（Tixcraft 票務主流程）
+[2025-07-04 16:46:27] [Log] Chrome extension 未啟用，需程式自動勾選同意
+[2025-07-04 16:46:27] [Log] 呼叫 tixcraft_ticket_main_agree，嘗試自動勾選同意條款
+[2025-07-04 16:46:27] [Log] 第 1 次嘗試勾選同意框
+[2025-07-04 16:46:28] [Log] 找到checkbox, 是否顯示: True, 是否啟用: True, 是否已選: False
+[2025-07-04 16:46:28] [Log] checkbox HTML:<input type="checkbox" id="TicketForm_agree" class="form-check-input" name="TicketForm[agree]" value="1">
+[2025-07-04 16:46:28] [Log] 嘗試點擊 checkbox
+[2025-07-04 16:46:28] [Log] 勾選成功，跳出回圈
+[2025-07-04 16:46:28] [Log] 勾選同意條款流程結束
+[2025-07-04 16:46:28] [Log] 執行 tixcraft_assign_ticket_number，準備選擇票數
+[2025-07-04 16:46:28] [Log] 票數指派結果：is_ticket_number_assigned=False
+[2025-07-04 16:46:28] [Log] 尚未選到票數，嘗試用 ticket_number_select_fill 填入票數
+[2025-07-04 16:46:28] [Log] ticket_number_select_fill 結果：is_ticket_number_assigned=True
+[2025-07-04 16:46:28] [Log] 已選到票數，開始驗證碼處理
+[2025-07-04 16:46:31] [Log] tixcraft_ticket_main_ocr 執行完成
+[2025-07-04 16:52:42] [Log] 進入 tixcraft_ticket_main（Tixcraft 票務主流程）
+[2025-07-04 16:52:42] [Log] Chrome extension 未啟用，需程式自動勾選同意
+[2025-07-04 16:52:42] [Log] 呼叫 tixcraft_ticket_main_agree，嘗試自動勾選同意條款
+[2025-07-04 16:52:42] [Log] 第 1 次嘗試勾選同意框
+[2025-07-04 16:52:42] [Log] 找到checkbox, 是否顯示: True, 是否啟用: True, 是否已選: False
+[2025-07-04 16:52:42] [Log] checkbox HTML:<input type="checkbox" id="TicketForm_agree" class="form-check-input" name="TicketForm[agree]" value="1">
+[2025-07-04 16:52:42] [Log] 嘗試點擊 checkbox
+[2025-07-04 16:52:42] [Log] 勾選成功，跳出回圈
+[2025-07-04 16:52:42] [Log] 勾選同意條款流程結束
+[2025-07-04 16:52:42] [Log] 執行 tixcraft_assign_ticket_number，準備選擇票數
+[2025-07-04 16:52:42] [Log] 票數指派結果：is_ticket_number_assigned=False
+[2025-07-04 16:52:42] [Log] 尚未選到票數，嘗試用 ticket_number_select_fill 填入票數
+[2025-07-04 16:52:42] [Log] ticket_number_select_fill 結果：is_ticket_number_assigned=True
+[2025-07-04 16:52:42] [Log] 已選到票數，開始驗證碼處理
+[2025-07-04 16:52:42] [Log] 進入 tixcraft_ticket_main_ocr，準備開始驗證碼處理
+[2025-07-04 16:52:42] [Log] 啟動自動辨識驗證碼 OCR 流程
+[2025-07-04 16:52:42] [Log] 第1次 OCR 辨識嘗試，開始時間：2025-07-04 16:52:42
+[2025-07-04 16:52:45] [Log] 第1次 OCR 執行結束，耗時 2.77 秒，is_form_sumbited=True
+[2025-07-04 16:52:45] [Log] 已成功送出表單，離開 OCR 辨識迴圈
+[2025-07-04 16:52:45] [Log] tixcraft_ticket_main_ocr 執行完成
+[2025-07-04 16:52:45] [Log] tixcraft_ticket_main_ocr 執行完成
+[2025-07-04 16:55:48] [Log] 進入 tixcraft_ticket_main（Tixcraft 票務主流程）
+[2025-07-04 16:55:48] [Log] Chrome extension 未啟用，需程式自動勾選同意
+[2025-07-04 16:55:48] [Log] 呼叫 tixcraft_ticket_main_agree，嘗試自動勾選同意條款
+[2025-07-04 16:55:48] [Log] 第 1 次嘗試勾選同意框
+[2025-07-04 16:55:48] [Log] 找到checkbox, 是否顯示: True, 是否啟用: True, 是否已選: False
+[2025-07-04 16:55:48] [Log] checkbox HTML:<input type="checkbox" id="TicketForm_agree" class="form-check-input" name="TicketForm[agree]" value="1">
+[2025-07-04 16:55:49] [Log] 嘗試點擊 checkbox
+[2025-07-04 16:55:49] [Log] 勾選成功，跳出回圈
+[2025-07-04 16:55:49] [Log] 勾選同意條款流程結束
+[2025-07-04 16:55:49] [Log] 執行 tixcraft_assign_ticket_number，準備選擇票數
+[2025-07-04 16:55:49] [Log] 票數指派結果：is_ticket_number_assigned=False
+[2025-07-04 16:55:49] [Log] 尚未選到票數，嘗試用 ticket_number_select_fill 填入票數
+[2025-07-04 16:55:49] [Log] ticket_number_select_fill 結果：is_ticket_number_assigned=True
+[2025-07-04 16:55:49] [Log] 已選到票數，開始驗證碼處理
+[2025-07-04 16:55:49] [Log] 進入 tixcraft_ticket_main_ocr，準備開始驗證碼處理
+[2025-07-04 16:55:49] [Log] 啟動自動辨識驗證碼 OCR 流程，最大重試次數：3
+[2025-07-04 16:55:49] [Log] 第1次 OCR 辨識嘗試，開始時間：2025-07-04 16:55:49
+[2025-07-04 16:55:51] [Log] 第1次 OCR 執行結束，耗時 2.45 秒，is_form_sumbited=True
+[2025-07-04 16:55:51] [Log] 已成功送出表單，離開 OCR 辨識迴圈
+[2025-07-04 16:55:51] [Log] OCR 總耗時：2.45 秒
+[2025-07-04 16:55:51] [Log] tixcraft_ticket_main_ocr 執行完成
+[2025-07-04 16:55:51] [Log] tixcraft_ticket_main_ocr 執行完成
